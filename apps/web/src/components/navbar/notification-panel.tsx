@@ -12,6 +12,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { Notification } from '@/types';
 
+
+
 const mockNotifications: Notification[] = [
   {
     id: '1',
