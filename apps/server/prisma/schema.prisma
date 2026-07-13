@@ -1,0 +1,837 @@
+// ─────────────────────────────────────────────────────────────
+// Telecom AI Command Center — Prisma Schema
+// Database: PostgreSQL
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum PermissionAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  MANAGE
+  EXECUTE
+}
+
+enum NodeType {
+  TOWER
+  BASE_STATION
+  ROUTER
+  SWITCH
+  GATEWAY
+  ANTENNA
+  FIBER_NODE
+  SMALL_CELL
+  DATA_CENTER
+}
+
+enum NodeStatus {
+  ONLINE
+  OFFLINE
+  DEGRADED
+  MAINTENANCE
+  DECOMMISSIONED
+}
+
+enum MetricType {
+  CPU_USAGE
+  MEMORY_USAGE
+  BANDWIDTH
+  LATENCY
+  PACKET_LOSS
+  SIGNAL_STRENGTH
+  THROUGHPUT
+  ERROR_RATE
+  UPTIME
+  TEMPERATURE
+}
+
+enum IncidentSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum IncidentStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+enum IncidentSource {
+  AI_DETECTED
+  MANUAL
+  MONITORING
+  AUTOMATED_RULE
+}
+
+enum TicketPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  WAITING_ON_INTERNAL
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+enum TicketCategory {
+  BILLING
+  NETWORK_ISSUE
+  SERVICE_OUTAGE
+  ACCOUNT_MANAGEMENT
+  TECHNICAL_SUPPORT
+  PLAN_CHANGE
+  NEW_SERVICE
+  COMPLAINT
+  OTHER
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  CHURNED
+  SUSPENDED
+}
+
+enum CustomerTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
+
+enum DashboardMetricCategory {
+  NETWORK
+  CUSTOMER
+  FINANCIAL
+  OPERATIONAL
+  AI_PERFORMANCE
+}
+
+enum DocumentType {
+  RUNBOOK
+  TROUBLESHOOTING_GUIDE
+  POLICY
+  ARCHITECTURE
+  SOP
+  FAQ
+  TRAINING_MATERIAL
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum AIActionType {
+  INCIDENT_TRIAGE
+  NETWORK_ANALYSIS
+  CUSTOMER_LOOKUP
+  TICKET_RESOLUTION
+  PREDICTIVE_ALERT
+  KNOWLEDGE_RETRIEVAL
+  BILLING_ANALYSIS
+  ESCALATION
+  COMMAND_EXECUTION
+}
+
+enum AIActionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PredictionType {
+  NETWORK_OUTAGE
+  EQUIPMENT_FAILURE
+  CUSTOMER_CHURN
+  TRAFFIC_SURGE
+  CAPACITY_THRESHOLD
+  SLA_BREACH
+}
+
+enum PredictionStatus {
+  PENDING
+  CONFIRMED
+  DISMISSED
+  EXPIRED
+}
+
+enum NotificationType {
+  INCIDENT_ALERT
+  SYSTEM_UPDATE
+  TICKET_UPDATE
+  AI_INSIGHT
+  PREDICTION_WARNING
+  MAINTENANCE_NOTICE
+  ESCALATION
+  GENERAL
+}
+
+enum NotificationPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WEBHOOK
+  PUSH
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  EXECUTE
+  APPROVE
+  REJECT
+  ESCALATE
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH & RBAC
+// ═══════════════════════════════════════════════════════════════
+
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  email          String     @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  displayName    String?
+  avatarUrl      String?
+  phone          String?
+  status         UserStatus @default(PENDING_VERIFICATION)
+  emailVerified  Boolean    @default(false)
+  lastLoginAt    DateTime?
+  lastLoginIp    String?
+  failedAttempts Int        @default(0)
+  lockedUntil    DateTime?
+  deletedAt      DateTime? // Soft delete
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relations
+  userRoles         UserRole[]
+  refreshTokens     RefreshToken[]
+  assignedIncidents Incident[]          @relation("IncidentAssignee")
+  reportedIncidents Incident[]          @relation("IncidentReporter")
+  incidentComments  IncidentComment[]
+  supportTickets    SupportTicket[]     @relation("TicketAssignee")
+  aiConversations   AIConversation[]
+  aiActionLogs      AIActionLog[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  knowledgeDocs     KnowledgeDocument[] @relation("DocumentAuthor")
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  displayName String
+  description String?
+  isSystem    Boolean  @default(false) // System roles cannot be deleted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  resource    String // e.g., "incidents", "network_nodes", "tickets"
+  action      PermissionAction
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @db.Uuid
+  roleId       String   @db.Uuid
+  permissionId String   @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  assignedBy String?  @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  token     String    @unique
+  userId    String    @db.Uuid
+  expiresAt DateTime
+  revokedAt DateTime?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NETWORK INFRASTRUCTURE
+// ═══════════════════════════════════════════════════════════════
+
+model NetworkNode {
+  id              String     @id @default(uuid()) @db.Uuid
+  name            String
+  type            NodeType
+  status          NodeStatus @default(ONLINE)
+  ipAddress       String?
+  macAddress      String?
+  latitude        Float?
+  longitude       Float?
+  location        String? // Human-readable location description
+  region          String?
+  vendor          String?
+  model           String?
+  firmwareVersion String?
+  serialNumber    String?    @unique
+  parentNodeId    String?    @db.Uuid
+  capacity        Int? // Max throughput in Mbps
+  metadata        Json? // Flexible additional properties
+  lastHeartbeat   DateTime?
+  deletedAt       DateTime? // Soft delete
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  parentNode NetworkNode?    @relation("NodeHierarchy", fields: [parentNodeId], references: [id], onDelete: SetNull)
+  childNodes NetworkNode[]   @relation("NodeHierarchy")
+  metrics    NetworkMetric[]
+  incidents  Incident[]
+
+  @@index([type])
+  @@index([status])
+  @@index([region])
+  @@index([parentNodeId])
+  @@index([deletedAt])
+  @@index([lastHeartbeat])
+  @@index([type, status, region])
+  @@map("network_nodes")
+}
+
+model NetworkMetric {
+  id         String     @id @default(uuid()) @db.Uuid
+  nodeId     String     @db.Uuid
+  type       MetricType
+  value      Float
+  unit       String // e.g., "%", "ms", "Mbps", "°C"
+  threshold  Float? // Alert threshold
+  isAnomaly  Boolean    @default(false)
+  metadata   Json?
+  recordedAt DateTime   @default(now())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Relations
+  node NetworkNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([type])
+  @@index([recordedAt])
+  @@index([isAnomaly])
+  @@index([nodeId, type, recordedAt])
+  @@map("network_metrics")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INCIDENT MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+
+model Incident {
+  id               String           @id @default(uuid()) @db.Uuid
+  title            String
+  description      String
+  severity         IncidentSeverity
+  status           IncidentStatus   @default(OPEN)
+  source           IncidentSource?
+  affectedServices String[]
+  rootCause        String?
+  resolution       String?
+  impactSummary    String?
+  nodeId           String?          @db.Uuid
+  assigneeId       String?          @db.Uuid
+  reporterId       String?          @db.Uuid
+  escalatedAt      DateTime?
+  acknowledgedAt   DateTime?
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  slaDeadline      DateTime?
+  metadata         Json?
+  deletedAt        DateTime? // Soft delete
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relations
+  node        NetworkNode?      @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  assignee    User?             @relation("IncidentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter    User?             @relation("IncidentReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  comments    IncidentComment[]
+  predictions Prediction[]
+
+  @@index([severity])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([reporterId])
+  @@index([nodeId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([severity, status])
+  @@index([status, severity, createdAt])
+  @@index([slaDeadline])
+  @@map("incidents")
+}
+
+model IncidentComment {
+  id         String    @id @default(uuid()) @db.Uuid
+  incidentId String    @db.Uuid
+  authorId   String?   @db.Uuid
+  content    String
+  isInternal Boolean   @default(false) // Internal notes vs. public comments
+  metadata   Json?
+  deletedAt  DateTime? // Soft delete
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  author   User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId])
+  @@index([authorId])
+  @@index([deletedAt])
+  @@map("incident_comments")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMER & SUPPORT
+// ═══════════════════════════════════════════════════════════════
+
+model Customer {
+  id             String         @id @default(uuid()) @db.Uuid
+  accountNumber  String         @unique
+  firstName      String
+  lastName       String
+  email          String         @unique
+  phone          String?
+  address        String?
+  city           String?
+  state          String?
+  zipCode        String?
+  country        String?
+  tier           CustomerTier   @default(BASIC)
+  status         CustomerStatus @default(ACTIVE)
+  monthlyRevenue Float?
+  lifetimeValue  Float?
+  churnRisk      Float? // 0.0 to 1.0 probability
+  contractStart  DateTime?
+  contractEnd    DateTime?
+  metadata       Json?
+  deletedAt      DateTime? // Soft delete
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  supportTickets SupportTicket[]
+  predictions    Prediction[]
+
+  @@index([accountNumber])
+  @@index([email])
+  @@index([tier])
+  @@index([status])
+  @@index([churnRisk])
+  @@index([deletedAt])
+  @@map("customers")
+}
+
+model SupportTicket {
+  id              String         @id @default(uuid()) @db.Uuid
+  ticketNumber    String         @unique
+  customerId      String         @db.Uuid
+  assigneeId      String?        @db.Uuid
+  subject         String
+  description     String
+  category        TicketCategory
+  priority        TicketPriority @default(MEDIUM)
+  status          TicketStatus   @default(OPEN)
+  channel         String? // "phone", "email", "chat", "portal"
+  resolution      String?
+  satisfaction    Int? // 1-5 CSAT score
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  slaDeadline     DateTime?
+  tags            String[]
+  metadata        Json?
+  deletedAt       DateTime? // Soft delete
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  assignee User?    @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([assigneeId])
+  @@index([category])
+  @@index([priority])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([priority, status])
+  @@index([assigneeId, status, priority])
+  @@index([slaDeadline])
+  @@map("support_tickets")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+model DashboardMetric {
+  id         String                  @id @default(uuid()) @db.Uuid
+  name       String
+  key        String // Machine-readable key, e.g. "total_active_nodes"
+  value      Float
+  unit       String?
+  category   DashboardMetricCategory
+  trend      Float? // Percentage change from previous period
+  target     Float? // Target/goal value
+  period     String? // "hourly", "daily", "weekly", "monthly"
+  metadata   Json?
+  recordedAt DateTime                @default(now())
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@unique([key, recordedAt])
+  @@index([key])
+  @@index([category])
+  @@index([recordedAt])
+  @@index([category, recordedAt])
+  @@map("dashboard_metrics")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KNOWLEDGE BASE
+// ═══════════════════════════════════════════════════════════════
+
+model KnowledgeDocument {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String
+  content     String // Full document content (markdown)
+  summary     String?
+  type        DocumentType
+  tags        String[]
+  version     Int          @default(1)
+  isPublished Boolean      @default(false)
+  authorId    String?      @db.Uuid
+  embedding   Float[] // Vector embedding for semantic search
+  sourceUrl   String?
+  metadata    Json?
+  deletedAt   DateTime? // Soft delete
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  author User? @relation("DocumentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([isPublished])
+  @@index([authorId])
+  @@index([deletedAt])
+  @@index([tags])
+  @@map("knowledge_documents")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI CONVERSATIONS & MESSAGES
+// ═══════════════════════════════════════════════════════════════
+
+model AIConversation {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @db.Uuid
+  title       String?
+  status      ConversationStatus @default(ACTIVE)
+  model       String? // AI model used, e.g., "gpt-4", "gemini-pro"
+  totalTokens Int                @default(0)
+  context     Json? // Conversation-level context/memory
+  metadata    Json?
+  deletedAt   DateTime? // Soft delete
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  // Relations
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+  actions  AIActionLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @db.Uuid
+  role           MessageRole
+  content        String
+  tokenCount     Int?
+  toolCalls      Json? // Structured tool call data
+  toolResults    Json? // Results from tool executions
+  latencyMs      Int? // Response generation time
+  model          String? // Model used for this specific message
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([role])
+  @@index([createdAt])
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI ACTION LOG
+// ═══════════════════════════════════════════════════════════════
+
+model AIActionLog {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String?        @db.Uuid
+  userId         String?        @db.Uuid
+  actionType     AIActionType
+  status         AIActionStatus @default(PENDING)
+  input          Json? // Action input parameters
+  output         Json? // Action result/output
+  errorMessage   String?
+  durationMs     Int? // Execution time
+  agentName      String? // Which AI agent performed this
+  confidence     Float? // 0.0 to 1.0 confidence score
+  metadata       Json?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  conversation AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId])
+  @@index([userId])
+  @@index([actionType])
+  @@index([status])
+  @@index([agentName])
+  @@index([createdAt])
+  @@index([actionType, status])
+  @@map("ai_action_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PREDICTIONS
+// ═══════════════════════════════════════════════════════════════
+
+model Prediction {
+  id             String           @id @default(uuid()) @db.Uuid
+  type           PredictionType
+  status         PredictionStatus @default(PENDING)
+  title          String
+  description    String
+  confidence     Float // 0.0 to 1.0
+  impact         String? // Estimated impact description
+  probability    Float? // 0.0 to 1.0
+  predictedAt    DateTime // When the event is predicted to occur
+  expiresAt      DateTime? // When the prediction becomes irrelevant
+  acknowledgedAt DateTime?
+  incidentId     String?          @db.Uuid
+  customerId     String?          @db.Uuid
+  modelVersion   String? // ML model version that generated this
+  inputFeatures  Json? // Features used for prediction
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Relations
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([status])
+  @@index([confidence])
+  @@index([predictedAt])
+  @@index([incidentId])
+  @@index([customerId])
+  @@index([type, status])
+  @@index([expiresAt])
+  @@map("predictions")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+
+model Notification {
+  id        String               @id @default(uuid()) @db.Uuid
+  userId    String               @db.Uuid
+  type      NotificationType
+  priority  NotificationPriority @default(MEDIUM)
+  channel   NotificationChannel  @default(IN_APP)
+  title     String
+  message   String
+  link      String? // Deep link to related resource
+  isRead    Boolean              @default(false)
+  readAt    DateTime?
+  sentAt    DateTime?
+  expiresAt DateTime?
+  metadata  Json?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([priority])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([userId, isRead, createdAt])
+  @@index([expiresAt])
+  @@map("notifications")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUDIT LOG
+// ═══════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String?     @db.Uuid
+  action      AuditAction
+  resource    String // e.g., "incident", "user", "network_node"
+  resourceId  String? // ID of the affected resource
+  description String?
+  oldValues   Json? // Snapshot before change
+  newValues   Json? // Snapshot after change
+  ipAddress   String?
+  userAgent   String?
+  sessionId   String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([createdAt])
+  @@index([userId, action])
+  @@index([resource, resourceId, createdAt])
+  @@map("audit_logs")
+}
