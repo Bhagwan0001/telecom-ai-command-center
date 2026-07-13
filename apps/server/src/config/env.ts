@@ -38,7 +38,7 @@ const cleanEnvString = z.preprocess((val) => {
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(4000),
-  DATABASE_URL: cleanEnvString.pipe(z.string().url()),
+  DATABASE_URL: cleanEnvString,
   REDIS_URL: cleanEnvString.default("redis://localhost:6379"),
   JWT_SECRET: cleanEnvString.pipe(z.string().min(32)),
   JWT_REFRESH_SECRET: cleanEnvString.pipe(z.string().min(32)),
