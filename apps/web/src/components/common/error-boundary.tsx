@@ -23,7 +23,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Error caught by boundary
+    console.error("Error Boundary caught an error:", error);
+    console.error("Error Info:", errorInfo);
   }
 
   handleReset = () => {
