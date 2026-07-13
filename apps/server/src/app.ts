@@ -34,6 +34,11 @@ app.use(morganMiddleware);
 // --- Rate Limiting ---
 app.use('/api/', apiRateLimiter);
 
+// --- Health Check ---
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', service: 'TAICC API', version: '1.0.0' });
+});
+
 // --- Routes ---
 app.use('/api/v1', apiRouter);
 
