@@ -29,12 +29,19 @@ Current System Status:
 - Open Tickets: ${overview.openTickets}
 
 Recent Incidents:
-${incidents.map(i => `- ${i.severity} [${i.node?.name || "Unknown"}]: ${i.title}`).join("\n")}
+${incidents
+        .map((i: any) => `- ${i.severity} [${i.node?.name || "Unknown"}]: ${i.title}`)
+        .join("\n")}
 
 Network Health Summary:
-${networkHealth.slice(0, 5).map(n =>
-      `- Node ${n.name} (${n.status}): CPU ${n.metrics.find(m => m.type === "CPU_USAGE")?.value || 0
-      }%`).join("\n")}
+${networkHealth
+        .slice(0, 5)
+        .map(
+          (n: any) =>
+            `- Node ${n.name} (${n.status}): CPU ${n.metrics.find((m: any) => m.type === "CPU_USAGE")?.value || 0
+            }%`
+        )
+        .join("\n")}
 `;
 
     const prompt = `
@@ -79,7 +86,7 @@ ${message}
 
       return JSON.parse(response.text || "{}");
 
-    } catch (error) {
+    } catch (error: unknown) {
 
       return {
         summary: `${overview.criticalIncidents} critical incidents detected across ${overview.activeNodes} active network nodes.`,
