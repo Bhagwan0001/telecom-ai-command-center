@@ -30,16 +30,21 @@ import { z } from "zod";
 
 dotenv.config();
 
+const cleanEnvString = z.preprocess((val) => {
+  if (typeof val !== "string") return val;
+  return val.replace(/^["']|["']$/g, "").trim();
+}, z.string());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(4000),
-  DATABASE_URL: z.string().url(),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
-  JWT_SECRET: z.string().min(32),
-  JWT_REFRESH_SECRET: z.string().min(32),
-  CORS_ORIGIN: z.string(),
+  DATABASE_URL: cleanEnvString.pipe(z.string().url()),
+  REDIS_URL: cleanEnvString.default("redis://localhost:6379"),
+  JWT_SECRET: cleanEnvString.pipe(z.string().min(32)),
+  JWT_REFRESH_SECRET: cleanEnvString.pipe(z.string().min(32)),
+  CORS_ORIGIN: cleanEnvString,
 
-  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: cleanEnvString.pipe(z.string().min(1)),
 });
 
 const parsed = envSchema.safeParse(process.env);
