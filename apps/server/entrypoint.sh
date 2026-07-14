@@ -1,16 +1,16 @@
 #!/bin/sh
-set -e
 
 # Helper: strips KEY=VALUE prefix + surrounding quotes from an env var value
-# Handles cases where someone pastes "DATABASE_URL=postgresql://..." as the value
 clean_env_var() {
   val="$1"
-  # If value starts with SOMETHING=, strip the KEY= part
+  # Strip KEY=VALUE prefix if present (e.g. "DATABASE_URL=postgresql://...")
   val=$(echo "$val" | sed 's/^[A-Za-z_][A-Za-z0-9_]*=//')
   # Strip leading/trailing double quotes
   val=$(echo "$val" | sed -e 's/^"//' -e 's/"$//')
   # Strip leading/trailing single quotes
   val=$(echo "$val" | sed -e "s/^'//" -e "s/'$//")
+  # Strip trailing slash
+  val=$(echo "$val" | sed 's|/$||')
   # Strip surrounding whitespace
   val=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
   echo "$val"
@@ -46,11 +46,12 @@ if [ -n "$GEMINI_API_KEY" ]; then
   export GEMINI_API_KEY
 fi
 
-echo "DATABASE_URL prefix check: $(echo "$DATABASE_URL" | cut -c1-20)..."
+echo "DATABASE_URL prefix: $(echo "$DATABASE_URL" | cut -c1-25)..."
+echo "CORS_ORIGIN: $CORS_ORIGIN"
 
-# Sync database schema
+# Sync database schema — non-fatal, server starts regardless
 echo "Running prisma db push..."
-npx prisma db push --skip-generate --accept-data-loss
+npx prisma db push --skip-generate --accept-data-loss && echo "DB push OK" || echo "WARNING: DB push failed, starting server anyway"
 
 echo "Starting server..."
 exec node dist/index.js
