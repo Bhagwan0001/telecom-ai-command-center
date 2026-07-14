@@ -49,9 +49,14 @@ fi
 echo "DATABASE_URL prefix: $(echo "$DATABASE_URL" | cut -c1-25)..."
 echo "CORS_ORIGIN: $CORS_ORIGIN"
 
-# Sync database schema — non-fatal, server starts regardless
+# Sync database schema — push schema to DB
 echo "Running prisma db push..."
-npx prisma db push --skip-generate --accept-data-loss && echo "DB push OK" || echo "WARNING: DB push failed, starting server anyway"
+if npx prisma db push --skip-generate --accept-data-loss; then
+  echo "DB schema synced. Running seed..."
+  npx tsx prisma/seed.ts && echo "Seed complete" || echo "WARNING: Seed failed (data may already exist)"
+else
+  echo "WARNING: DB push failed — server will still start with empty data fallbacks"
+fi
 
 echo "Starting server..."
 exec node dist/index.js
