@@ -13,11 +13,11 @@ const app = express();
 
 // --- Security Middleware ---
 app.use(helmet());
+const allowedOrigins = env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, ''));
+
 app.use(
   cors({
-    origin: env.CORS_ORIGIN.indexOf(',') !== -1 
-      ? env.CORS_ORIGIN.split(',').map(o => o.trim()) 
-      : env.CORS_ORIGIN,
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     credentials: true,
   })
 );
