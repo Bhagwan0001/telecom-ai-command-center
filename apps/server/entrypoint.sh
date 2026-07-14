@@ -1,34 +1,42 @@
 #!/bin/sh
+set -e
 
-# Clean leading/trailing quotes and whitespaces from environment variables
+# Strip leading/trailing quotes from DATABASE_URL (common issue when pasting from .env files into Railway)
 if [ -n "$DATABASE_URL" ]; then
-  export DATABASE_URL=$(echo "$DATABASE_URL" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  DATABASE_URL=$(echo "$DATABASE_URL" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  export DATABASE_URL
 fi
 
 if [ -n "$REDIS_URL" ]; then
-  export REDIS_URL=$(echo "$REDIS_URL" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  REDIS_URL=$(echo "$REDIS_URL" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  export REDIS_URL
 fi
 
 if [ -n "$JWT_SECRET" ]; then
-  export JWT_SECRET=$(echo "$JWT_SECRET" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  JWT_SECRET=$(echo "$JWT_SECRET" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  export JWT_SECRET
 fi
 
 if [ -n "$JWT_REFRESH_SECRET" ]; then
-  export JWT_REFRESH_SECRET=$(echo "$JWT_REFRESH_SECRET" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  JWT_REFRESH_SECRET=$(echo "$JWT_REFRESH_SECRET" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  export JWT_REFRESH_SECRET
 fi
 
 if [ -n "$CORS_ORIGIN" ]; then
-  export CORS_ORIGIN=$(echo "$CORS_ORIGIN" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  CORS_ORIGIN=$(echo "$CORS_ORIGIN" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  export CORS_ORIGIN
 fi
 
 if [ -n "$GEMINI_API_KEY" ]; then
-  export GEMINI_API_KEY=$(echo "$GEMINI_API_KEY" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  GEMINI_API_KEY=$(echo "$GEMINI_API_KEY" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  export GEMINI_API_KEY
 fi
 
-# Run database migrations
-echo "Running database migrations..."
-npx prisma migrate deploy
+echo "DATABASE_URL prefix check: $(echo "$DATABASE_URL" | cut -c1-15)..."
 
-# Start the application
-echo "Starting application..."
+# Sync database schema (create tables if they don't exist)
+echo "Running prisma db push..."
+npx prisma db push --skip-generate --accept-data-loss
+
+echo "Starting server..."
 exec node dist/index.js
