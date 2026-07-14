@@ -1,6 +1,9 @@
 {
   "name": "@taicc/web",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "private": true,
   "type": "module",
   "description": "TAICC Frontend - React 19 + Vite + Tailwind + Shadcn UI",
